@@ -1,0 +1,268 @@
+id: covid19_etl_pipeline
+namespace: kestra-task
+
+tasks:
+  - id: extracting_covid_data
+    type: io.kestra.plugin.scripts.python.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    beforeCommands:
+      - python3 -m venv .venv
+      - . .venv/bin/activate
+      - pip install pandas numpy requests
+    outputFiles:
+      - covid_data.csv
+    warningOnStdErr: false
+    script: |
+      import pandas as pd
+      import numpy as np
+      import requests
+      import re
+      from io import BytesIO
+
+      #Data extraction
+      #Setting Kaggle API credentials
+      KAGGLE_USERNAME = "nancyaodhiambo"
+      KAGGLE_KEY = "3a14f5c1864a7fba90f3b0fa462be0c4"
+
+      #Downloading the zip file directly
+      url = "https://www.kaggle.com/api/v1/datasets/download/meirnizri/covid19-dataset"
+      headers = {"Authorization": f"Bearer {KAGGLE_KEY}"}
+      response = requests.get(url, headers=headers, stream=True)
+
+      from zipfile import ZipFile
+      with ZipFile(BytesIO(response.content)) as my_file:
+          with my_file.open("Covid Data.csv") as data_file:
+              df = pd.read_csv(data_file, encoding='windows-1252')
+
+      #Saving data to CSV file
+      df.to_csv('covid_data.csv', index=False)
+
+  - id: transforming_covid_data
+    type: io.kestra.plugin.scripts.python.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    beforeCommands:
+      - python3 -m venv .venv
+      - . .venv/bin/activate
+      - pip install pandas numpy 
+    outputFiles:
+      - covid_data.csv
+    warningOnStdErr: false
+    script: |
+      import pandas as pd
+      import numpy as np
+      covid_data = pd.read_csv('{{ outputs.extracting_covid_data.outputFiles["covid_data.csv"] }}')
+
+      ## Renaming columns to snake case and lower case
+      covid_data.columns = covid_data.columns.str.replace(" ", "_")
+      covid_data.columns = covid_data.columns.str.lower()
+
+      ## Changing hipertension, patient_type and date_died variable names to hypertension and status
+      covid_data = covid_data.rename(columns={'hipertension': 'hypertension'})
+      covid_data = covid_data.rename(columns={'date_died': 'status'})
+      covid_data = covid_data.rename(columns={'patient_type': 'admission_status'})
+      covid_data = covid_data.rename(columns={'inmsupr': 'immunosuppressed'})
+
+      # Filling icu and intubed with 'No' where patient_type (admission_status) is 1
+      covid_data.loc[covid_data['admission_status'] == 1, ['icu', 'intubed']] = 2
+
+      ## Subsetting the data set to include fewer variables of interest
+      covid_data = covid_data[['copd', 'age', 'status', 'diabetes', 'sex', 'hypertension', 'immunosuppressed', 'admission_status', 'obesity', 'clasiffication_final', 'pneumonia', 'asthma', 'cardiovascular', 'icu', 'intubed']]
+
+      ## Keep only rows where Classification is 1, 2, or 3
+      covid_data = covid_data[covid_data['clasiffication_final'].isin([1, 2, 3])]
+
+      # Function to map classification variable values
+      def classify(row):
+          if row == 1:
+              return "Mild"
+          elif row == 2:
+              return "Moderate"
+          elif row == 3:
+              return "Severe"
+          else:
+              return "Unknown"
+
+      ## Function to map status changes
+      def map_status(value):
+          if pd.isna(value) or value.strip() == "":
+              return "Unknown"
+          elif value == "9999-99-99":
+              return "Alive"
+          else:
+              return "Dead"
+
+      ## Function to map Sex changes
+      def map_sex(value):
+          if value == 1:
+              return "Female"
+          elif value == 2:
+              return "Male"
+          else:
+              return "Unknown"
+
+      ## Function to admission_status
+      def map_admission_status(value):
+          if value == 1:
+              return "No"
+          elif value == 2:
+              return "Yes"
+          else:
+              return "Unknown"
+
+      ## Application of the mapping functions in status, classification_final and sex variables
+      covid_data['clasiffication_final'] = covid_data['clasiffication_final'].apply(classify)
+      covid_data['status'] = covid_data['status'].apply(map_status)
+      covid_data['sex'] = covid_data['sex'].apply(map_sex)
+      covid_data['admission_status'] = covid_data['admission_status'].apply(map_admission_status)
+
+      ## Function to map Yes/No changes
+      def map_yes_no(value):
+          if value == 1:
+              return "Yes"
+          elif value == 2:
+              return "No"
+          else:
+              return "Unknown"
+
+      ## List of my columns that need the change
+      columns_to_map = ['pneumonia', 'diabetes', 'obesity', 'immunosuppressed', 'copd', 'asthma', 'hypertension', 'cardiovascular', 'icu', 'intubed']
+
+      ## Application of the function to change the entries in the variables from 1,2 to Yes/No
+      for column in columns_to_map:
+          if column in covid_data.columns:
+              covid_data[column] = covid_data[column].apply(map_yes_no)
+
+      ## Checking unknown values
+      columns_to_check = ['pneumonia', 'diabetes', 'obesity', 'immunosuppressed', 'copd', 'asthma', 'hypertension', 'cardiovascular', 'status', 'sex', 'clasiffication_final', 'admission_status', 'icu', 'intubed']
+      total_entries = covid_data.shape[0]
+
+      ## Removing the unknown values from my data set from the functions above
+      covid_data = covid_data[~covid_data[columns_to_check].isin(['Unknown']).any(axis=1)]
+
+      ## Removing the 97,98,99 that signify the missing values and unknown values.
+      covid_data = covid_data[~covid_data['age'].isin([97, 98, 99])]
+
+      ## Calculating outliers and removing them from the age variable
+      Q1 = covid_data['age'].quantile(0.25)
+      Q3 = covid_data['age'].quantile(0.75)
+      IQR = Q3 - Q1
+      lower_bound = Q1 - 1.5 * IQR
+      upper_bound = Q3 + 1.5 * IQR
+      covid_data = covid_data[(covid_data['age'] >= lower_bound) & (covid_data['age'] <= upper_bound)]
+
+      ## Creating a copy for data encoding and modeling section
+      covid_data_copy = covid_data.copy()
+
+      ## Aggregation and feature engineering
+      ### Data encoding for the binary categorical data for the correlation matrix
+      def encode_column(col):
+          if col in covid_data_copy.columns:
+              unique_vals = covid_data_copy[col].unique()
+              if set(unique_vals).issubset({'Yes', 'No'}):
+                  covid_data_copy[col] = covid_data_copy[col].map({'Yes': 1, 'No': 0})
+              elif col == 'status':
+                  covid_data_copy[col] = covid_data_copy[col].map({'Alive': 1, 'Dead': 0})
+              elif col == 'sex':
+                  covid_data_copy[col] = covid_data_copy[col].map({'Female': 0, 'Male': 1})
+              elif col == 'admission_status':
+                  covid_data_copy[col] = covid_data_copy[col].map({'No': 0, 'Yes': 1})
+
+      for col in covid_data_copy.columns:
+          encode_column(col)
+
+      ### One-Hot Encoding for the 'clasiffication_final' column for correlation matrix
+      covid_data_copy = pd.get_dummies(covid_data_copy, columns=['clasiffication_final'], drop_first=True)
+
+      ### Creating age groups to check proportions of patient outcomes such as intubed, icu and death.
+      bins = [0, 18, 35, 50, 65, 80, 120]
+      labels = ['0-18', '19-35', '36-50', '51-65', '66-80', '81+']
+      covid_data['age_group'] = pd.cut(covid_data['age'], bins=bins, labels=labels, right=False)
+
+      #### Define target indicators
+      indicators = {
+          'icu': 'Yes',
+          'intubed': 'Yes',
+          'status': 'Dead'
+      }
+
+      #### Loop through indicators and calculate proportions by age group
+      for column, target_value in indicators.items():
+          proportions = (
+              covid_data[covid_data[column] == target_value]
+              .groupby('age_group', observed=True)
+              .size() / covid_data.groupby('age_group', observed=True).size()
+          ) * 100
+
+      covid_data.to_csv('covid_data.csv', index=False)
+
+  - id: loading_covid_data
+    type: io.kestra.plugin.scripts.python.Script
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    beforeCommands:
+      - python3 -m venv .venv
+      - . .venv/bin/activate
+      - pip install pandas numpy psycopg2-binary
+    warningOnStdErr: false
+    script: |
+      import pandas as pd
+      import psycopg2
+
+      covid_data = pd.read_csv('{{ outputs.transforming_covid_data.outputFiles["covid_data.csv"] }}')
+
+      # Connect to the PostgreSQL database running in Docker
+      conn = psycopg2.connect(
+          host="postgres",
+          database="kestra",
+          user="kestra",
+          password="k3str4"
+      )
+      cursor = conn.cursor()
+
+      # Create the table if it doesn't exist
+      create_table_query = """
+      CREATE TABLE IF NOT EXISTS transformed_data (
+          copd VARCHAR,
+          age INT,
+          status VARCHAR,
+          diabetes VARCHAR,
+          sex VARCHAR,
+          hypertension VARCHAR,
+          immunosuppressed VARCHAR,
+          admission_status VARCHAR,
+          obesity VARCHAR,
+          clasiffication_final VARCHAR,
+          pneumonia VARCHAR,
+          asthma VARCHAR,
+          cardiovascular VARCHAR,
+          icu VARCHAR,
+          intubed VARCHAR
+      )
+      """
+      cursor.execute(create_table_query)
+      conn.commit()
+
+      # Insert each row of the DataFrame into the table
+      for index, row in covid_data.iterrows():
+          cursor.execute(
+              """
+              INSERT INTO transformed_data (
+                  copd, age, status, diabetes, sex, hypertension, immunosuppressed,
+                  admission_status, obesity, clasiffication_final, pneumonia,
+                  asthma, cardiovascular, icu, intubed
+              )
+              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+              """,
+              (
+                  row['copd'], row['age'], row['status'], row['diabetes'], row['sex'],
+                  row['hypertension'], row['immunosuppressed'], row['admission_status'],
+                  row['obesity'], row['clasiffication_final'], row['pneumonia'],
+                  row['asthma'], row['cardiovascular'], row['icu'], row['intubed']
+              )
+          )
+
+      conn.commit()
+      cursor.close()
+      conn.close()
