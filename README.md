@@ -6,12 +6,8 @@
 ---
 
 ### 👩‍💻 Student Information
-- **Name:** Odhiambo Nancy Anyango  
-- **Major:** Data Science and Analytics  
+- **Name:** Odhiambo Nancy Anyango 
 - **Course:** Data Engineering, CIS 660  
-- **G/NO:** G02559137  
-- **Professor:** Sorio Boit  
-- **Semester:** Winter 2025  
 
 ---
 
