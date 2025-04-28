@@ -5,12 +5,6 @@
 
 ---
 
-### 👩‍💻 Student Information
-- **Name:** Odhiambo Nancy Anyango 
-- **Course:** Data Engineering, CIS 660  
-
----
-
 ## 📂 Table of Contents
 - [Project Overview](#project-overview)
 - [Software Setup](#software-setup)
