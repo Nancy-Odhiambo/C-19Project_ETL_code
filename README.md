@@ -137,10 +137,15 @@ The goal is to provide actionable insights for healthcare management, enhancing 
 - **Kaggle API:** Data extraction.
 
 ---
+
+📬 Contact
+Nancy Odhiambo
+Email: odhiambn@mail.gvsu.edu
+GitHub: Nancy-Odhiambo
+
 ---
 ## 🚀 Getting Started
 
-```bash
 # Clone the repository
 git clone https://github.com/Nancy-Odhiambo/C-19Project_ETL_code.git
 cd C-19Project_ETL_code
@@ -151,6 +156,4 @@ pip install -r requirements.txt
 # Run the dashboard
 streamlit run covid19_dashboard.py
 
-## Contact
-![](odhiambn@mail.gvsu.edu)
 
