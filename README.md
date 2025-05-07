@@ -152,4 +152,5 @@ pip install -r requirements.txt
 streamlit run covid19_dashboard.py
 
 ## Contact
-odhiambn@mail.gvsu.edu
+![](odhiambn@mail.gvsu.edu)
+
