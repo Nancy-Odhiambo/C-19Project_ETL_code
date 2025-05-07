@@ -44,6 +44,8 @@ The goal is to provide actionable insights for healthcare management, enhancing 
 
 ---
 
+![Kestra and postgreSQL containerization](images/containerization.png)
+
 ## 🔄 ETL Process
 
 ### 🗂️ Data Extraction
@@ -72,6 +74,10 @@ The goal is to provide actionable insights for healthcare management, enhancing 
 
 ---
 
+![ETL](images/etl.png)
+
+![transformed_data](images/transformed_data.png)
+
 ## 📈 Data Analysis and Visualization
 - Tools: SQLAlchemy, Pandas, Seaborn, Matplotlib.
 - Focus:
@@ -80,7 +86,6 @@ The goal is to provide actionable insights for healthcare management, enhancing 
   - Outcome (Alive/Dead) distribution by comorbidities and severity.
   - Correlation analysis between features and mortality.
   
-
 ---
 
 ## 🌐 Streamlit Dashboard
