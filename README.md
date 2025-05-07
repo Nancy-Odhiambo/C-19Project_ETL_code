@@ -139,8 +139,11 @@ The goal is to provide actionable insights for healthcare management, enhancing 
 ---
 
 📬 Contact
+
 Nancy Odhiambo
+
 Email: odhiambn@mail.gvsu.edu
+
 GitHub: Nancy-Odhiambo
 
 ---
@@ -148,6 +151,7 @@ GitHub: Nancy-Odhiambo
 
 # Clone the repository
 git clone https://github.com/Nancy-Odhiambo/C-19Project_ETL_code.git
+
 cd C-19Project_ETL_code
 
 # Install required packages
