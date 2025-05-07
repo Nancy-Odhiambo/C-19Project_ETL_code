@@ -108,7 +108,7 @@ The goal is to provide actionable insights for healthcare management, enhancing 
 ### 🧪 Severity Outcome Visualization
 ![Severity Outcome Plot](images/severity_outcome.png)
 
-### 🔥 Correlation Heatmap
+### 🔥 Admission Status by Death rate
 ![Admission Status by Death Rate](images/admission_status_by_deathrate.png)
 
 ---
